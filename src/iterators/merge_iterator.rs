@@ -15,10 +15,10 @@
 #![allow(unused_variables)] // TODO(you): remove this lint after implementing this mod
 #![allow(dead_code)] // TODO(you): remove this lint after implementing this mod
 
+use anyhow::Result;
 use std::cmp::{self};
 use std::collections::BinaryHeap;
-
-use anyhow::Result;
+use std::collections::binary_heap::PeekMut;
 
 use crate::key::KeySlice;
 
@@ -59,7 +59,16 @@ pub struct MergeIterator<I: StorageIterator> {
 
 impl<I: StorageIterator> MergeIterator<I> {
     pub fn create(iters: Vec<Box<I>>) -> Self {
-        unimplemented!()
+        let mut heap = BinaryHeap::new();
+        for (idx, iter) in iters.into_iter().enumerate() {
+            if iter.is_valid() {
+                heap.push(HeapWrapper(idx, iter));
+            }
+        }
+        Self {
+            current: heap.pop(),
+            iters: heap,
+        }
     }
 }
 
@@ -69,18 +78,53 @@ impl<I: 'static + for<'a> StorageIterator<KeyType<'a> = KeySlice<'a>>> StorageIt
     type KeyType<'a> = KeySlice<'a>;
 
     fn key(&self) -> KeySlice<'_> {
-        unimplemented!()
+        self.current.as_ref().unwrap().1.key()
     }
 
     fn value(&self) -> &[u8] {
-        unimplemented!()
+        self.current.as_ref().unwrap().1.value()
     }
 
     fn is_valid(&self) -> bool {
-        unimplemented!()
+        self.current.is_some()
     }
 
     fn next(&mut self) -> Result<()> {
-        unimplemented!()
+        if self.current.is_none() {
+            return Ok(());
+        }
+
+        let current_key = self.current.as_ref().unwrap().1.key().to_key_vec();
+
+        // Take ownership of the current iterator
+        let mut current = self.current.take().unwrap();
+
+        // Advance it
+        current.1.next()?;
+
+        // Put it back if it still has data
+        if current.1.is_valid() {
+            self.iters.push(current);
+        }
+
+        // Skip older versions of the same key
+        while let Some(top) = self.iters.peek() {
+            if top.1.key() != current_key.as_key_slice() {
+                break;
+            }
+
+            let mut iter = PeekMut::pop(self.iters.peek_mut().unwrap());
+
+            iter.1.next()?;
+
+            if iter.1.is_valid() {
+                self.iters.push(iter);
+            }
+        }
+
+        // Smallest remaining iterator becomes current
+        self.current = self.iters.pop();
+
+        Ok(())
     }
 }
