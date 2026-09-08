@@ -43,9 +43,7 @@ impl SsTableBuilder {
     ///
     /// Note: You should split a new block when the current block is full.(`std::mem::replace` may
     /// be helpful here)
-    pub fn add(&mut self, key: KeySlice, value: &[u8]) {
-        unimplemented!()
-    }
+    pub fn add(&mut self, key: KeySlice, value: &[u8]) {}
 
     /// Get the estimated size of the SSTable.
     ///

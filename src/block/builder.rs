@@ -33,13 +33,16 @@ pub struct BlockBuilder {
     first_key: KeyVec,
 }
 fn compute_overlap(first_key: KeySlice, key: KeySlice) -> usize {
-    let mut i = 0;
-    while i < first_key.len() && i < key.len() && first_key.raw_ref()[i] == key.raw_ref()[i] {
-        i += i;
-    }
-    i
-}
+    let max_len = std::cmp::min(first_key.len(), key.len());
 
+    for i in 0..max_len {
+        if first_key.raw_ref()[i] != key.raw_ref()[i] {
+            return i;
+        }
+    }
+
+    max_len
+}
 impl BlockBuilder {
     /// Creates a new block builder.
     pub fn new(block_size: usize) -> Self {
